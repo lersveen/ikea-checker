@@ -1,11 +1,17 @@
+import os
+
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from yagmail import SMTP
 
 cc = 'no'
 lc = 'no'
 contract_header = '37249'
 consumer_header = 'MAMMUT'
+
+gmail_user = os.environ.get('GMAIL_USER')
+gmail_password = os.environ.get('GMAIL_PASSWORD')
 
 
 def start_session(retries=None, session=None, backoff_factor=0, status_forcelist=(500, 502, 503, 504)):
@@ -71,8 +77,6 @@ def get_product_info(product_ids):
     try:
         product_ids_string = ';'.join(['ART,'+p for p in product_ids])
 
-        print(product_ids_string)
-
         r = session.get(
             url=f'https://securema2.ikea.com/catalog/v2/{cc}/{lc}/product/{product_ids_string}',
             )
@@ -91,6 +95,13 @@ def get_product_info(product_ids):
         return None
 
 
+def send_mail(subject, body):
+    SMTP(gmail_user, gmail_password).send(
+        to=gmail_user,
+        subject=subject,
+        contents=body)
+
+
 def get_product_availability(store_id, product_id):
     try:
         r = session.get(
@@ -104,26 +115,89 @@ def get_product_availability(store_id, product_id):
         return None
 
 
+def build_result(products, stores):
+    items = []
+    for product in products:
+        item = {
+                'product_id': product['ItemNo'],
+                'product_name': f'{product["ProductName"]} ({product["ProductTypeName"]}, {product["ValidDesignText"]})',
+                'available': False,
+                'stock': []
+                }
+
+        for store in stores:
+            avail = (get_product_availability(store['StoreNo'], product['ItemNo']))
+            stock = int(avail['StockAvailability']['RetailItemAvailability']['AvailableStock']['$'])
+
+            store_stock = {
+                'store_id': store['StoreNo'],
+                'store_name': store['StoreName'],
+                'stock': stock
+            }
+
+            if stock > 0:
+                item['available'] = True
+            else:
+                restock_datetime = avail['StockAvailability']['RetailItemAvailability']['RestockDateTime'].get('$')
+                if restock_datetime:
+                    store_stock['restock_datetime'] = restock_datetime
+
+            item['stock'].append(store_stock)
+        items.append(item)
+    return items
+
+
 if __name__ == '__main__':
     session = start_session()
 
     store_names = ['Slependen', 'Furuset']
-
-    products = ['00454557']
+    product_ids = ['00454557', '00324325', '10457329']
 
     stores = get_store_info(store_names)
 
-    product_info = get_product_info(products)
+    products = get_product_info(product_ids)
 
-    # parse_availability()
-    available = []
-    for product_id in products:
-        for store in stores:
-            store_name = store['StoreName']
-            avail = (get_product_availability(store['StoreNo'], product_id))
-            stock = int(avail['StockAvailability']['RetailItemAvailability']['AvailableStock']['$'])
-            print(f'{stock} of {product_id} available at IKEA {store_name}')
+    result = build_result(products, stores)
+    
+    available_items = []
+    unavailable_items = []
+    for item in result:
+        if item['available']:
+            available_items.append(item)
+        else:
+            unavailable_items.append(item)
 
-            if not stock > 0:
-                restock_datetime = avail['StockAvailability']['RetailItemAvailability']['RestockDateTime'].get('$')
-                print(f'{product_id} expected at IKEA {store_name} at {restock_datetime}')
+    if available_items:
+        # available_items_string = '\n'.join([(': '.join([([key, str(val)]) for key, val in item.items()])) for item in unavailable_items])
+        available_items_string = ''
+        unavailable_items_string = ''
+
+        for item in available_items:
+            available_items_string += \
+                    f'{item["product_id"]} - {item["product_name"]}\n'
+
+        if unavailable_items:
+            for item in unavailable_items:
+                for store in items['stock']:
+
+
+                unavailable_items_string += \
+                    f'{item["product_id"]} - {item["product_name"]}\n' \
+                    f'{item["stock"]}'
+                    
+
+
+        body = \
+            'Hey, me!\n\n' \
+            'Now available:\n' \
+            f'{available_items_string}\n\n' \
+            'Still not available:\n' \
+            f'{unavailable_items_string}'
+
+        print(body)
+        # send_mail('Ikea Availability', body)
+
+
+    print(result)
+
+    # send_mail('test')

@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 requests = "*"
+yagmail = "*"
 
 [dev-packages]
 
