@@ -168,22 +168,36 @@ if __name__ == '__main__':
             unavailable_items.append(item)
 
     if available_items:
-        # available_items_string = '\n'.join([(': '.join([([key, str(val)]) for key, val in item.items()])) for item in unavailable_items])
         available_items_string = ''
-        unavailable_items_string = ''
-
         for item in available_items:
+            stock_string = ''
+            for store in item['stock']:
+                if store.get('restock_datetime'):
+                    restock_string =  f'– expected {store["restock_datetime"]}'
+                else:
+                    restock_string = ''
+                stock_string += \
+                    f'  IKEA {store["store_name"]}: {store["stock"]} in stock{restock_string}\n'
+
             available_items_string += \
-                    f'{item["product_id"]} - {item["product_name"]}\n'
+                f'{item["product_id"]} - {item["product_name"]}\n' \
+                f'{stock_string}\n'
 
         if unavailable_items:
+            unavailable_items_string = ''
             for item in unavailable_items:
-                for store in items['stock']:
-
+                stock_string = ''
+                for store in item['stock']:
+                    if store.get('restock_datetime'):
+                        restock_string =  f'– expected {store["restock_datetime"]}'
+                    else:
+                        restock_string = ''
+                    stock_string += \
+                        f'  IKEA {store["store_name"]}: {store["stock"]} in stock{restock_string}\n'
 
                 unavailable_items_string += \
                     f'{item["product_id"]} - {item["product_name"]}\n' \
-                    f'{item["stock"]}'
+                    f'{stock_string}\n'
                     
 
 
