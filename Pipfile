@@ -5,9 +5,10 @@ name = "pypi"
 
 [packages]
 requests = "*"
-yagmail = "*"
+yagmail = {extras = ["all"], version = "*"}
 
 [dev-packages]
+pylint = "*"
 
 [requires]
 python_version = "3.9"

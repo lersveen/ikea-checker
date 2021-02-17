@@ -1,18 +1,23 @@
 import os
+import sys
 
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from yagmail import SMTP
+import yagmail
 
 cc = 'no'
 lc = 'no'
 contract_header = '37249'
 consumer_header = 'MAMMUT'
 
-gmail_user = os.environ.get('GMAIL_USER')
-gmail_password = os.environ.get('GMAIL_PASSWORD')
+try:
+    gmail_user = str(sys.argv[1])
+except IndexError:
+    print('You need to provide a Gmail username as an argument')
+    sys.exit(1)
 
+yag = yagmail.SMTP(gmail_user, yagmail.password.handle_password(gmail_user, None))
 
 def start_session(retries=None, session=None, backoff_factor=0, status_forcelist=(500, 502, 503, 504)):
     session = session or requests.Session()
@@ -95,11 +100,11 @@ def get_product_info(product_ids):
         return None
 
 
-def send_mail(subject, body):
-    SMTP(gmail_user, gmail_password).send(
-        to=gmail_user,
+def send_mail(to, subject, contents):
+    yag.send(
+        to=to,
         subject=subject,
-        contents=body)
+        contents=contents)
 
 
 def get_product_availability(store_id, product_id):
@@ -122,6 +127,7 @@ def build_result(products, stores):
                 'product_id': product['ItemNo'],
                 'product_name': f'{product["ProductName"]} ({product["ProductTypeName"]}, {product["ValidDesignText"]})',
                 'available': False,
+                'image_url': f'https://www.ikea.com{product["RetailItemImageList"]["RetailItemImage"][1]["ImageUrl"]}',
                 'stock': []
                 }
 
@@ -147,18 +153,7 @@ def build_result(products, stores):
     return items
 
 
-if __name__ == '__main__':
-    session = start_session()
-
-    store_names = ['Slependen', 'Furuset']
-    product_ids = ['00454557', '00324325', '10457329']
-
-    stores = get_store_info(store_names)
-
-    products = get_product_info(product_ids)
-
-    result = build_result(products, stores)
-    
+def parse_result(result):
     available_items = []
     unavailable_items = []
     for item in result:
@@ -168,50 +163,49 @@ if __name__ == '__main__':
             unavailable_items.append(item)
 
     if available_items:
-        available_items_string = ''
-        for item in available_items:
-            stock_string = ''
-            for store in item['stock']:
-                if store.get('restock_datetime'):
-                    restock_string =  f'– expected {store["restock_datetime"]}'
-                else:
-                    restock_string = ''
-                stock_string += \
-                    f'  IKEA {store["store_name"]}: {store["stock"]} in stock{restock_string}\n'
-
-            available_items_string += \
-                f'{item["product_id"]} - {item["product_name"]}\n' \
-                f'{stock_string}\n'
+        available_items_string = build_items_string(available_items)
 
         if unavailable_items:
-            unavailable_items_string = ''
-            for item in unavailable_items:
-                stock_string = ''
-                for store in item['stock']:
-                    if store.get('restock_datetime'):
-                        restock_string =  f'– expected {store["restock_datetime"]}'
-                    else:
-                        restock_string = ''
-                    stock_string += \
-                        f'  IKEA {store["store_name"]}: {store["stock"]} in stock{restock_string}\n'
-
-                unavailable_items_string += \
-                    f'{item["product_id"]} - {item["product_name"]}\n' \
-                    f'{stock_string}\n'
-                    
-
+            unavailable_items_string = build_items_string(unavailable_items)
 
         body = \
-            'Hey, me!\n\n' \
-            'Now available:\n' \
-            f'{available_items_string}\n\n' \
-            'Still not available:\n' \
-            f'{unavailable_items_string}'
+            '<h1>Hey, me!</h1>\n\n' \
+            f'<h2>Now available:</h2>\n{available_items_string}\n\n' \
+            f'<h2>Still not available:</h2>\n{unavailable_items_string}' if unavailable_items else ''
+        return body
+    else:
+        return None
 
-        print(body)
-        # send_mail('Ikea Availability', body)
+def build_items_string(items):
+    items_string = ''
+    for item in items:
+        stock_string = ''
+        for store in item['stock']:
+            if store.get('restock_datetime'):
+                restock_string =  f'– expected {store["restock_datetime"]}'
+            else:
+                restock_string = ''
+            stock_string += \
+                f'  IKEA {store["store_name"]}: {store["stock"]} in stock{restock_string}\n'
+
+        items_string += \
+            f'<b>{item["product_name"]}</b> – {item["product_id"]}\n<img src="{item["image_url"]}" />\n' \
+            f'{stock_string}\n'
+    return items_string
 
 
-    print(result)
+if __name__ == '__main__':
+    session = start_session()
 
-    # send_mail('test')
+    store_names = ['Slependen', 'Furuset']
+    product_ids = ['00454557', '00324325']
+
+    result = build_result(get_product_info(product_ids), get_store_info(store_names))
+
+    message = parse_result(result)
+
+    if message:
+        send_mail(gmail_user, 'Ikea Availability', message)
+        print(f'Found products in stock – mailing results to {gmail_user}')
+    else:
+        print('None of the checked products are in stock')

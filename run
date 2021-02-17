@@ -1,0 +1,3 @@
+#!/bin/bash
+cd $(cd -P -- "$(dirname -- "$0")" && pwd -P)
+pipenv run python3 ikea-checker.py $1 2>&1
