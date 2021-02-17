@@ -1,0 +1,20 @@
+#!/bin/bash
+DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
+
+# Unload if service already loaded
+launchctl list | grep ikea-checker > /dev/null \
+&& launchctl unload ~/Library/LaunchAgents/com.github.lersveen.ikea-checker.plist
+
+# Copy plist and load launchd service
+cp $DIR/com.github.lersveen.ikea-checker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.github.lersveen.ikea-checker.plist
+
+# Check that service is running
+sleep 2
+launchctl list | grep ikea-checker > /dev/null \
+&& echo 'Ikea-checker launchd service installed successfully' \
+|| (echo 'failed to install Ikea-checker launchd service'; exit 1)
+
+# Keep terminal open
+echo ''
+read -p 'Press Enter to exit'

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Unload service
+launchctl list | grep ikea-checker > /dev/null \
+&& launchctl unload ~/Library/LaunchAgents/com.github.lersveen.ikea-checker.plist \
+|| echo 'Ikea-checker launchd service is not installed'
+
+# Remove plist
+rm -f ~/Library/LaunchAgents/com.github.lersveen.ikea-checker.plist > /dev/null
+
+# Check that service is not running
+sleep 2
+launchctl list | grep ikea-checker > /dev/null \
+&& echo 'Failed to remove Ikea-checker launchd service' \
+|| echo 'Ikea-checker launchd service removed successfully'
+
+# Keep terminal open
+echo ''
+read -p 'Press Enter to exit'
