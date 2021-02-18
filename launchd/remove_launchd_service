@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Find script directory and go there
+DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
+cd $DIR
+
+# Find service plist
+FILE=$(ls *.plist| head -1) # Returns first .plist file in folder
+SERVICE=${FILE%.plist} # Strips .plist
+NAME=${SERVICE##*.} # Gets part of service name after last dot
+
+# Unload service
+if [[ $(launchctl list | grep $SERVICE) ]]; then
+    was_loaded=true
+    launchctl unload ~/Library/LaunchAgents/$FILE &> /dev/null
+fi
+
+# Remove plist
+if [[ $(cat ~/Library/LaunchAgents/$FILE 2> /dev/null) ]]; then
+    rm -f ~/Library/LaunchAgents/$FILE &> /dev/null \
+    && plist_removed=true
+fi
+
+# Check that service is not running
+if [[ $(launchctl list | grep $SERVICE) ]]; then
+    echo 'Failed to remove '$NAME' launchd service'
+    (exit 1)
+else
+    if [ "$was_loaded" = true ] && [ "$plist_removed" = true ]; then
+        echo 'Launchd service '$NAME' and plist removed successfully'
+    elif [ "$plist_removed" = true ]; then
+        echo 'Launchd service '$NAME' was not loaded, but plist file removed successfully'
+    else
+        echo 'Launchd service '$NAME' is not installed, did nothing'
+    fi
+    (exit 0)
+fi
+
+# Keep exit code
+EXIT=$?
+
+# Keep terminal open
+echo ''
+read -p 'Press Enter to exit'
+
+exit $EXIT

@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Find script directory and go there
+DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
+cd $DIR
+
+# Find service plist
+FILE="$(ls *.plist| head -1)" # Returns first .plist file in folder
+SERVICE=${FILE%.plist} # Strips .plist
+NAME=${SERVICE##*.} # Gets part of service name after last dot
+
+# Unload if service already loaded
+if [[ $(launchctl list | grep $SERVICE) ]]; then
+    echo 'Service already loaded – unloading and reloading'
+    launchctl unload ~/Library/LaunchAgents/$FILE &> /dev/null
+fi
+
+# Copy plist and load launchd service
+cp $DIR/$FILE ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/$FILE
+
+# Check that service is running
+if [[ $(launchctl list | grep $SERVICE) ]]; then
+    echo 'Launchd service '$NAME' installed successfully'
+    (exit 0)
+else
+    echo 'Failed to install '$NAME' launchd service'
+    (exit 1)
+fi
+
+# Keep exit code
+EXIT=$?
+
+# Keep terminal open
+echo ''
+read -p 'Press Enter to exit'
+
+exit $EXIT
