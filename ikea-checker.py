@@ -144,7 +144,11 @@ def build_result(products, stores):
             if stock > 0:
                 item['available'] = True
             else:
-                restock_datetime = avail['StockAvailability']['RetailItemAvailability']['RestockDateTime'].get('$')
+                try:
+                    restock_datetime = avail['StockAvailability']['RetailItemAvailability']['RestockDateTime'].get('$')
+                except KeyError:
+                    restock_datetime = None
+                
                 if restock_datetime:
                     store_stock['restock_datetime'] = restock_datetime
 
