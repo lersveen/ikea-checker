@@ -198,11 +198,17 @@ def build_items_string(items):
     return items_string
 
 
+def get_list_from_file(filename):
+    with open (str(filename), "r") as f:
+        data = f.read().splitlines()
+    return data
+
+
 if __name__ == '__main__':
     session = start_session()
 
-    store_names = ['Slependen', 'Furuset']
-    product_ids = ['00454557', '00324325']
+    store_names = get_list_from_file('stores.txt')
+    product_ids = get_list_from_file('products.txt')
 
     result = build_result(get_product_info(product_ids), get_store_info(store_names))
 
